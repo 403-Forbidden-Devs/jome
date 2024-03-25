@@ -1,10 +1,12 @@
 import os
 import sys
+import asyncio
 
 import api4jenkins
-from api4jenkins import Jenkins
+from api4jenkins import Jenkins, AsyncJenkins
 from dotenv import load_dotenv
 import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 load_dotenv()
 
@@ -16,17 +18,18 @@ logging.log(logging.INFO, "Starting Jenkins")
 USER = "admin" if os.environ.get("JENKINS_USER") is None else os.environ.get("JENKINS_USER")
 PASSWORD = "password" if os.environ.get("PASSWORD") is None else os.environ.get("PASSWORD")
 API_KEY = "password" if os.environ.get("API_KEY") is None else os.environ.get("API_KEY")
+
 server = Jenkins('https://jenkins.piramalfinance.com', auth=(USER, PASSWORD))
 
-version = server.version
-logging.log(logging.INFO, "Jenkins version: {}".format(version))
+#version = server.version
+#logging.log(logging.INFO, "Jenkins version: {}".format(await version))
 
 
-def get_service_info(service_name):
+async def get_service_info(service_name):
     job = server.get_job(service_name)
     print(job)
 
-def find_job(job_name):
+async def find_job(job_name):
     for entities in server:
         print("{}: {}".format(entities.name, entities.description))
         print("{}".format(type(entities)))
@@ -36,7 +39,7 @@ def find_job(job_name):
                 if type(job) is api4jenkins.job.FreeStyleProject and job_name in job.full_name:
                     print(job.get_last_completed_build())
                 if type(job) is api4jenkins.job.Folder:
-                    for job in entities.iter():
+                    for job in  entities.iter():
                         print("type of inside jobs level 2: {}".format(type(job)))
                         if type(job) is api4jenkins.job.FreeStyleProject and job_name in job.full_name:
                             print(job.get_last_completed_build())
@@ -58,7 +61,11 @@ def find_job_recursive(folder_list, entity, job_name):
 
 
 
-def iter_job():
+#@retry(stop=stop_after_attempt(3), wait=wait_exponential())
+async def iter_job():
+    version =  server.version
+    logging.log(logging.INFO, "Jenkins version: {}".format(version))
+
     for job in server.iter():
         print(job)
         print(dir(job))
@@ -86,4 +93,4 @@ if __name__ == '__main__':
     # service_name = sys.argv[1]
     name = sys.argv[1]
     # find_job(name)
-    iter_job()
+    asyncio.run(iter_job())
